@@ -367,3 +367,39 @@ body {
   font-size: 1.25rem;
   color: var(--text-muted);
 }
+
+.form-button-secondary {
+  width: 100%;
+  padding: 0.75rem;
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.form-button-secondary:hover:not(:disabled) {
+  background: #7c3aed;
+  transform: translateY(-1px);
+}
+
+.form-button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.suggestion-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.suggestion-box p {
+  margin: 0.25rem 0;
+  color: #0c4a6e;
+}

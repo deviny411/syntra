@@ -49,21 +49,24 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTree = () => {
-    fetch("http://localhost:4000/api/tree")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch tree");
-        return res.json();
-      })
-      .then((data: KnowledgeTree) => {
-        setTree(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching tree:", err);
-        setError(err.message);
-        setLoading(false);
-      });
-  };
+  console.log('🔄 Fetching tree...');  // 👈 Add this
+  fetch("http://localhost:4000/api/tree")
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch tree");
+      return res.json();
+    })
+    .then((data: KnowledgeTree) => {
+      console.log('✅ Tree fetched:', data.nodes.length, 'nodes,', data.edges.length, 'edges');  // 👈 Add this
+      setTree(data);
+      setLoading(false);
+    })
+    .catch((err) => {
+      console.error("Error fetching tree:", err);
+      setError(err.message);
+      setLoading(false);
+    });
+};
+
 
   useEffect(() => {
     fetchTree();

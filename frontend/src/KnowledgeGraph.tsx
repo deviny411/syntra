@@ -31,55 +31,63 @@ interface KnowledgeGraphProps {
 
 export default function KnowledgeGraph({ tree }: KnowledgeGraphProps) {
   // Create initial nodes structure
-  const initialNodes: Node[] = useMemo(() => tree.nodes.map((node) => ({
-    id: node.id,
-    type: 'default',
-    data: { 
-      label: node.label
-    },
-    position: { x: Math.random() * 500, y: Math.random() * 500 },
-    style: {
-      background: 'white',
-      color: '#333',
-      border: `3px solid ${subjectColors[node.subject] || subjectColors.Other}`,
-      borderRadius: '16px',
-      padding: '10px 18px',
-      fontSize: '15px',
-      fontWeight: '600',
-      width: 160,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-      transition: 'all 0.3s ease',
-    },
-  })), [tree.nodes]);
+ const initialNodes: Node[] = useMemo(() => tree.nodes.map((node) => ({
+  id: node.id,
+  type: 'default',
+  data: { 
+    label: node.label
+  },
+  position: { x: Math.random() * 500, y: Math.random() * 500 },
+  style: {
+    background: 'white',
+    color: '#333',
+    border: node.id === 'syntra' 
+      ? '4px solid #8b5cf6'  // Thicker purple border for Syntra
+      : `3px solid ${subjectColors[node.subject] || subjectColors.Other}`,
+    borderRadius: node.id === 'syntra' ? '20px' : '16px',
+    padding: node.id === 'syntra' ? '14px 24px' : '10px 18px',
+    fontSize: node.id === 'syntra' ? '18px' : '15px',  // Bigger text
+    fontWeight: node.id === 'syntra' ? '700' : '600',  // Bolder
+    width: node.id === 'syntra' ? 200 : 160,  // Wider
+    boxShadow: node.id === 'syntra' 
+      ? '0 4px 16px rgba(139, 92, 246, 0.25)'  // Purple glow
+      : '0 2px 8px rgba(0,0,0,0.08)',
+    transition: 'all 0.3s ease',
+  },
+})), [tree.nodes]);
 
-  const initialEdges: Edge[] = useMemo(() => tree.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.from,
-    target: edge.to,
-    type: 'bezier',
-    animated: edge.type === 'prereq',
-    label: edge.type,
-    labelStyle: { fill: '#666', fontWeight: 600, fontSize: '11px' },
-    labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
-    style: { 
-      stroke: edge.type === 'prereq' ? '#3b82f6' : '#10b981',
-      strokeWidth: 2.5,
-    },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: edge.type === 'prereq' ? '#3b82f6' : '#10b981',
-      width: 20,
-      height: 20,
-    },
-  })), [tree.edges]);
+const initialEdges: Edge[] = useMemo(() => tree.edges.map((edge) => ({
+  id: edge.id,
+  source: edge.from,
+  target: edge.to,
+  type: 'dafault',
+  style: { 
+    stroke: edge.type === 'related' ? '#10b981' : '#456fb9ff',  // Green for related, gray for prereq
+    strokeWidth: 2,
+    strokeDasharray: edge.type === 'related' ? '5,5' : undefined,  // Dashed for related
+  },
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    color: edge.type === 'related' ? '#10b981' : '#436399ff',
+    width: 18,
+    height: 18,
+  },
+})), [tree.edges]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update nodes when tree changes
-  useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
+
+const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+// Update nodes when tree changes
+useEffect(() => {
+  setNodes(initialNodes);
+}, [initialNodes, setNodes]);
+
+// Update edges when tree changes  👈 ADD THIS
+useEffect(() => {
+  setEdges(initialEdges);
+}, [initialEdges, setEdges]);
 
   // Force simulation
   useEffect(() => {
@@ -95,10 +103,15 @@ export default function KnowledgeGraph({ tree }: KnowledgeGraphProps) {
       .force('center', forceCenter(400, 300))
       .force('collision', forceCollide().radius(100))
       .force('y', forceY((d: any) => {
-        return d.id.includes('-root') ? 50 : 300;
+        if (d.id === 'syntra') return 30;  // Keep Syntra at the very top
+        if (d.id.includes('-root')) return 180;  // Push other roots further down
+        return 350;  // Regular nodes even further
       }).strength((d: any) => {
-        return d.id.includes('-root') ? 0.8 : 0.1;
+        if (d.id === 'syntra') return 1.0;  // Maximum strength - very pinned
+        if (d.id.includes('-root')) return 0.7;  // Medium strength
+        return 0.05;  // Very weak - flow naturally
       }))
+
       .force(
         'link',
         forceLink(d3Links)
