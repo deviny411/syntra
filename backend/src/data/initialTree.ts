@@ -1,5 +1,3 @@
-import { KnowledgeTree } from "../models/concept";
-
 export const initialTree: KnowledgeTree = {
   nodes: [
     {
@@ -7,7 +5,6 @@ export const initialTree: KnowledgeTree = {
       label: "Syntra",
       subject: "Other",
       masteryLevel: "none",
-      // No parents - this is the root
     },
     {
       id: "math-root",
@@ -27,6 +24,20 @@ export const initialTree: KnowledgeTree = {
       id: "hist-root",
       label: "History",
       subject: "History",
+      masteryLevel: "none",
+      parents: ["syntra"],
+    },
+    {
+      id: "chem-root",  // 👈 Add this
+      label: "Chemistry",
+      subject: "Chemistry",
+      masteryLevel: "none",
+      parents: ["syntra"],
+    },
+    {
+      id: "phys-root",  // 👈 Add this
+      label: "Physics",
+      subject: "Physics",
       masteryLevel: "none",
       parents: ["syntra"],
     },
@@ -64,7 +75,6 @@ export const initialTree: KnowledgeTree = {
     },
   ],
   edges: [
-    // Manual "related" edge for cross-topic connection
     { id: "lin-alg-nn", from: "lin-alg", to: "nn", type: "related" },
   ],
 };

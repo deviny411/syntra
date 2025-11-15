@@ -23,7 +23,7 @@ export interface ConceptNode {
   label: string;
   subject: Subject;
   masteryLevel: MasteryLevel;
-  parents?: string[];  // 👈 NEW: Auto-generates prereq edges
+  parents?: string[];  // 👈 Add this line
   tags?: string[];
 }
 
@@ -36,5 +36,5 @@ export interface ConceptEdge {
 
 export interface KnowledgeTree {
   nodes: ConceptNode[];
-  edges: ConceptEdge[];  // Manual edges for related/merge
+  edges: ConceptEdge[];
 }

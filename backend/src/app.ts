@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import aiRouter from "./routes/ai.routes";
 import treeRouter from "./routes/tree.routes";
 
 dotenv.config();
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/tree", treeRouter);
+app.use("/api/ai", aiRouter);  
 
 // Health check
 app.get("/", (_req, res) => {
