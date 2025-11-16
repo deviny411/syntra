@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import axios from "axios";
 import * as xml2js from "xml2js";
+import { geminiService } from "../services/geminiService";
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ async function fetchWikipediaSummary(concept: string) {
         summary: res.data.extract,
         url: res.data.content_urls?.desktop?.page,
         image: res.data.thumbnail?.source,
+        isAiGenerated: false,
       };
     } catch (exactErr: any) {
       if (exactErr.response?.status !== 404) {
@@ -51,12 +53,47 @@ async function fetchWikipediaSummary(concept: string) {
 
     const results = searchRes.data.query?.search;
     if (!results || results.length === 0) {
-      console.warn(`[Wikipedia] No search results for '${concept}'`);
-      return null;
+      console.warn(`[Wikipedia] No search results for '${concept}', using AI summary`);
+      // Use AI summary as fallback
+      const aiSummary = await geminiService.generateConceptSummary(concept);
+      return {
+        title: aiSummary.title,
+        summary: aiSummary.summary,
+        url: null,
+        image: null,
+        isAiGenerated: true,
+      };
     }
 
     const topResult = results[0];
-    console.log(`[Wikipedia] Found best match: '${topResult.title}' for '${concept}'`);
+    const resultTitle = topResult.title.toLowerCase();
+    const conceptLower = concept.toLowerCase();
+    
+    // Check if result is completely unrelated (check for any word overlap)
+    const conceptWords = conceptLower.split(/\s+/).filter((w: string) => w.length > 2); // Ignore short words like "in", "of"
+    const resultWords = resultTitle.split(/\s+/).filter((w: string) => w.length > 2);
+    
+    // Check if at least ONE significant word matches
+    const hasAnyMatch = conceptWords.some((cWord: string) => 
+      resultWords.some((rWord: string) => 
+        cWord.includes(rWord) || rWord.includes(cWord) || cWord === rWord
+      )
+    );
+    
+    console.log(`[Wikipedia] Found best match: '${topResult.title}' for '${concept}' (hasMatch: ${hasAnyMatch})`);
+    
+    // Only use AI if completely unrelated (no word matches at all)
+    if (!hasAnyMatch) {
+      console.warn(`[Wikipedia] Result completely unrelated, using AI summary`);
+      const aiSummary = await geminiService.generateConceptSummary(concept);
+      return {
+        title: aiSummary.title,
+        summary: aiSummary.summary,
+        url: null,
+        image: null,
+        isAiGenerated: true,
+      };
+    }
 
     // Now fetch the summary of the top search result
     const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topResult.title)}`;
@@ -67,10 +104,25 @@ async function fetchWikipediaSummary(concept: string) {
       summary: summaryRes.data.extract,
       url: summaryRes.data.content_urls?.desktop?.page,
       image: summaryRes.data.thumbnail?.source,
+      isAiGenerated: false,
     };
   } catch (err: any) {
     console.error(`[Wikipedia] Error for '${concept}':`, err.response?.status, err.response?.data?.title || err.message);
-    return null;
+    console.warn(`[Wikipedia] Falling back to AI summary due to error`);
+    // Fallback to AI summary on any error
+    try {
+      const aiSummary = await geminiService.generateConceptSummary(concept);
+      return {
+        title: aiSummary.title,
+        summary: aiSummary.summary,
+        url: null,
+        image: null,
+        isAiGenerated: true,
+      };
+    } catch (aiErr) {
+      console.error(`[AI Summary] Failed:`, aiErr);
+      return null;
+    }
   }
 }
 

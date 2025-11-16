@@ -256,6 +256,70 @@ Respond ONLY with valid JSON:
     return JSON.parse(jsonText);
   },
 
+  // Generate bridge topic between two related concepts
+  generateBridgeTopic: async (
+    topic1: string,
+    topic2: string,
+    existingNodes: Array<{ id: string; label: string; subject: string }>
+  ): Promise<{
+    label: string;
+    subject: string;
+    description: string;
+    parents: string[];
+    reasoning: string;
+  }> => {
+    console.log(`\n🌉 Generating bridge topic between: "${topic1}" and "${topic2}"`);
+    
+    const nodesList = existingNodes
+      .map(n => `- ${n.label} (${n.subject}, id: ${n.id})`)
+      .join('\n');
+
+    const prompt = `You are an expert knowledge structure designer. A user wants to explore the intersection between "${topic1}" and "${topic2}".
+
+EXISTING TOPICS IN THE KNOWLEDGE BASE:
+${nodesList}
+
+Your task: Generate ONE bridge topic that combines concepts from both "${topic1}" and "${topic2}". This should be a topic that requires understanding BOTH parent concepts.
+
+EXAMPLES:
+- Functions + Arrays → "Array Methods" or "Map and Filter"
+- Linear Algebra + Neural Networks → "Neural Network Layers" or "Backpropagation Mathematics"
+- Quantum Mechanics + Computer Science → "Quantum Computing" or "Quantum Algorithms"
+- Chemistry + Biology → "Biochemistry" or "Enzyme Kinetics"
+- Calculus + Physics → "Classical Mechanics" or "Differential Equations in Motion"
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{
+  "label": "bridge topic name (2-4 words)",
+  "subject": "subject category",
+  "description": "brief explanation of how this bridges both concepts",
+  "parents": ["${topic1.toLowerCase().replace(/\s+/g, '-')}", "${topic2.toLowerCase().replace(/\s+/g, '-')}"],
+  "reasoning": "why this topic is a good bridge"
+}
+
+CRITICAL RULES:
+- DO NOT use formats like "X in Y" or "X and Y" - be more specific
+- The label should be a specific concept, technique, or application
+- Example: Instead of "Linear Algebra in Neural Networks", use "Neural Network Layers" or "Weight Matrices"
+- Instead of "Math in Physics", use "Differential Equations" or "Vector Calculus"
+- The bridge topic should require knowledge of BOTH parents
+- Subject should match the most relevant category (Math, CS, Physics, etc.)
+- Keep the label concise and clear (2-4 words max)
+- Description should explain the connection (1-2 sentences)`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-001',
+      contents: prompt,
+    });
+
+    const jsonText = await extractJSON(response);
+    const parsed = JSON.parse(jsonText);
+    
+    console.log('✅ PARSED BRIDGE TOPIC:', JSON.stringify(parsed, null, 2));
+    return parsed;
+  },
+
   // Generate subtopics for Intra Mode
   generateSubtopics: async (
     topicName: string,
@@ -317,5 +381,47 @@ RULES:
     
     console.log('✅ PARSED SUBTOPICS:', JSON.stringify(parsed, null, 2));
     return parsed;
+  },
+  // Generate a concept summary using AI
+  generateConceptSummary: async (conceptName: string): Promise<{
+    title: string;
+    summary: string;
+    isAiGenerated: boolean;
+  }> => {
+    console.log(`\n🤖 Generating AI summary for: "${conceptName}"`);
+    
+    const prompt = `You are an educational expert. Provide a concise, accurate summary of the concept: "${conceptName}".
+
+Your summary should:
+- Be 2-3 paragraphs (150-250 words)
+- Explain what ${conceptName} is
+- Describe its key characteristics or components
+- Mention its importance or applications
+- Be accessible to learners at various levels
+
+Write in an encyclopedic style, similar to Wikipedia. Do not include external references or citations.
+
+Provide ONLY the summary text, no additional formatting or labels.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-001',
+      contents: prompt,
+    });
+
+    let summary = '';
+    if (typeof response.text === 'function') {
+      summary = await response.text();
+    } else if (typeof response.text === 'string') {
+      summary = response.text;
+    }
+    
+    summary = summary.trim();
+    console.log('✅ Generated AI summary:', summary.substring(0, 150) + '...');
+    
+    return {
+      title: conceptName,
+      summary,
+      isAiGenerated: true,
+    };
   },
 };

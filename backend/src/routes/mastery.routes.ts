@@ -3,6 +3,18 @@ import snowflakeService from "../services/snowflakeService";
 
 const router = express.Router();
 
+// Test Snowflake connection
+router.get("/test-connection", async (req: Request, res: Response) => {
+  try {
+    console.log("[Mastery Route] Testing Snowflake connection...");
+    await snowflakeService.connectToSnowflake();
+    res.json({ success: true, message: "Snowflake connection OK" });
+  } catch (err: any) {
+    console.error("[Mastery Route] Snowflake connection failed:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Log user interaction
 router.post("/log-interaction", async (req: Request, res: Response) => {
   try {
@@ -62,7 +74,7 @@ router.get("/mastery/:userId", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const scores = await snowflakeService.getUserMasteryScores(userId);
+    const scores = await snowflakeService.getAllMasteryScores(userId);
 
     res.json({ userId, scores });
   } catch (err: any) {
@@ -77,10 +89,16 @@ router.get("/mastery/:userId", async (req: Request, res: Response) => {
 router.get("/recommendations/:userId", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const { currentNodeId } = req.query;
 
-    const recommendations = await snowflakeService.getRecommendations(userId);
+    console.log(`[Mastery Routes] Getting recommendations for user: ${userId}, current node: ${currentNodeId || 'none'}`);
 
-    res.json({ userId, recommendations });
+    const response = await snowflakeService.getRecommendations(
+      userId,
+      currentNodeId as string
+    );
+
+    res.json(response);
   } catch (err: any) {
     console.error("[Mastery Routes] Error getting recommendations:", err);
     res

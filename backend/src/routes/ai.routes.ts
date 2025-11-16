@@ -97,4 +97,29 @@ router.post("/generate-subtopics", async (req, res) => {
   }
 });
 
+router.post("/generate-bridge-topic", async (req, res) => {
+  const { topic1, topic2 } = req.body;
+
+  if (!topic1 || !topic2) {
+    return res.status(400).json({ error: "topic1 and topic2 are required" });
+  }
+
+  try {
+    const existingNodes = treeService.getTree().nodes;
+    const bridgeTopic = await geminiService.generateBridgeTopic(
+      topic1,
+      topic2,
+      existingNodes
+    );
+
+    res.json(bridgeTopic);
+  } catch (error) {
+    console.error("AI generate bridge topic error:", error);
+    res.status(500).json({ 
+      error: "Failed to generate bridge topic",
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router;

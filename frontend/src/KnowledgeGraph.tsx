@@ -140,24 +140,28 @@ export default function KnowledgeGraph({ tree, onNodeSelect }: KnowledgeGraphPro
       },
       position: { x: Math.random() * 500, y: Math.random() * 500 },
       style: {
-        background: 'white',
-        color: '#333',
+        background: node.id === 'syntra'
+          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+          : 'white',
+        color: node.id === 'syntra' ? '#ffffff' : '#333',
         border: node.id === 'syntra' 
-          ? '4px solid #8b5cf6'
+          ? 'none'
           : `3px solid ${subjectColors[node.subject] || subjectColors.Other}`,
-        borderRadius: node.id === 'syntra' ? '20px' : '16px',
-        padding: node.id === 'syntra' ? '14px 24px' : '10px 18px',
-        fontSize: node.id === 'syntra' ? '18px' : '15px',
-        fontWeight: node.id === 'syntra' ? '700' : '600',
-        width: node.id === 'syntra' ? 200 : 160,
+        borderRadius: node.id === 'syntra' ? '24px' : '16px',
+        padding: node.id === 'syntra' ? '20px 32px' : '10px 18px',
+        fontSize: node.id === 'syntra' ? '24px' : '15px',
+        fontWeight: node.id === 'syntra' ? '800' : '600',
+        width: node.id === 'syntra' ? 220 : 160,
         boxShadow: isSelected
           ? `0 0 20px 4px ${subjectColors[node.subject] || subjectColors.Other}`
           : node.id === 'syntra' 
-          ? '0 4px 16px rgba(139, 92, 246, 0.25)'
+          ? '0 8px 32px rgba(102, 126, 234, 0.4), 0 4px 16px rgba(118, 75, 162, 0.3)'
           : '0 2px 8px rgba(0,0,0,0.08)',
         opacity: shouldDim ? 0.3 : 1,
         transition: 'all 0.3s ease',
         cursor: 'pointer',
+        letterSpacing: node.id === 'syntra' ? '1px' : 'normal',
+        textTransform: node.id === 'syntra' ? 'uppercase' as const : 'none' as const,
       },
     };
   }), [tree.nodes, selectedNodeId, highlightedNodes]);

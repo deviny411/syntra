@@ -53,6 +53,9 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
   const [expanded, setExpanded] = useState(false);
   const [intraModeLoading, setIntraModeLoading] = useState(false);
   const [intraModeError, setIntraModeError] = useState<string | null>(null);
+  const [bridgeLoading, setBridgeLoading] = useState<{ [key: string]: boolean }>({});
+  const [bridgedPairs, setBridgedPairs] = useState<Set<string>>(new Set());
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [panelOpenTime, setPanelOpenTime] = useState<number | null>(null);
   const [showContentModal, setShowContentModal] = useState(false);
   const [contentType, setContentType] = useState<'article' | 'video' | null>(null);
@@ -100,18 +103,24 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
 
   // Handle external link clicks
   const handleLinkClick = (type: 'article' | 'video') => {
+    console.log(`[Content Modal] Link clicked: ${type}`);
     setContentType(type);
-    // Show modal after they navigate back
-    window.addEventListener('focus', handleWindowFocus, { once: true });
-  };
-
-  const handleWindowFocus = () => {
-    if (contentType) {
-      setShowContentModal(true);
-    }
+    
+    // Use a timeout to ensure state is set and modal can check contentType
+    setTimeout(() => {
+      console.log(`[Content Modal] Setting up focus listener for ${type}`);
+      const focusHandler = () => {
+        console.log(`[Content Modal] Window focused, contentType: ${type}`);
+        setShowContentModal(true);
+      };
+      window.addEventListener('focus', focusHandler, { once: true });
+    }, 100);
   };
 
   const handleContentModalResponse = async (response: 'not_really' | 'sort_of' | 'yes' | 'well') => {
+    // Close modal immediately
+    setShowContentModal(false);
+    
     const interactionType = contentType === 'article' ? 'read_article' : 'watch_video';
     
     // Map understanding level to confidence levels
@@ -132,8 +141,11 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
     };
 
     console.log(`[Mastery] Logging ${interactionType} with response: ${response} (${confidence})`);
-    await logInteraction(interactionType, undefined, metadata);
-    setShowContentModal(false);
+    
+    // Log interaction in background
+    logInteraction(interactionType, undefined, metadata);
+    
+    // Clear content type
     setContentType(null);
   };
 
@@ -276,54 +288,68 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
           <section className="panel-section">
             <h3>Mastery Level</h3>
             {masteryLoading ? (
-              <div style={{ fontSize: '14px', color: '#666' }}>Loading mastery...</div>
+              <div style={{ fontSize: '14px', color: '#6b7280' }}>Loading mastery...</div>
             ) : (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                {Array.from({ length: 6 }).map((_, i) => {
-                  const threshold = (i + 1) * (100 / 6);
-                  const isFilled = (masteryScore || 0) >= threshold;
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        flex: 1,
-                        height: '24px',
-                        backgroundColor: isFilled ? '#10b981' : '#e5e7eb',
-                        borderRadius: '6px',
-                        transition: 'background-color 0.3s ease',
-                        cursor: 'default',
-                      }}
-                      title={`${((i + 1) * (100 / 6)).toFixed(0)}%`}
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+                    {Array.from({ length: 6 }).map((_, i) => {
+                      const targetMastery = (i + 1) * (100 / 6);
+                      const isFilled = (masteryScore || 0) >= targetMastery;
+                      return (
+                        <div
+                          key={i}
+                          onClick={async () => {
+                            console.log(`[Mastery] Setting to ${targetMastery.toFixed(0)}%`);
+                            setMasteryScore(targetMastery);
+                            
+                            // Log interaction based on level
+                            const interactionType = i >= 5 ? 'already_familiar' : 'read_article';
+                            await logInteraction(interactionType, 0);
+                            console.log(`[Mastery] ✅ Set to ${targetMastery.toFixed(0)}%`);
+                            
+                            // Recalculate on backend
+                            fetch(`/api/mastery/score/${userId}/${node.id}`);
+                          }}
+                          style={{
+                            flex: 1,
+                            height: '32px',
+                            backgroundColor: isFilled ? '#667eea' : '#e5e7eb',
+                            borderRadius: '6px',
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer',
+                          }}
+                          title={`Set to ${targetMastery.toFixed(0)}%`}
+                          onMouseEnter={(e) => {
+                            if (!isFilled) {
+                              e.currentTarget.style.backgroundColor = '#d1d5db';
+                            } else {
+                              e.currentTarget.style.backgroundColor = '#5a67d8';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isFilled) {
+                              e.currentTarget.style.backgroundColor = '#e5e7eb';
+                            } else {
+                              e.currentTarget.style.backgroundColor = '#667eea';
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '700', 
+                    color: '#667eea',
+                    minWidth: '60px',
+                    textAlign: 'right'
+                  }}>
+                    {Math.round(masteryScore || 0)}%
+                  </div>
+                </div>
+              </>
             )}
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>
-              {masteryLoading ? (
-                'Calculating...'
-              ) : (
-                <>
-                  {masteryScore === null || masteryScore === 0
-                    ? 'None - Not started'
-                    : masteryScore < 16.7
-                    ? 'Explored - Getting started'
-                    : masteryScore < 33.3
-                    ? 'Acquainted - Basic understanding'
-                    : masteryScore < 50
-                    ? 'Familiar - Comfortable with concepts'
-                    : masteryScore < 66.7
-                    ? 'Proficient - Strong understanding'
-                    : masteryScore < 83.3
-                    ? 'Advanced - Mastered'
-                    : 'Expert - Comprehensive mastery'}
-                  {' '}
-                  <span style={{ color: '#10b981', fontWeight: '700' }}>
-                    ({(masteryScore || 0).toFixed(1)}%)
-                  </span>
-                </>
-              )}
-            </div>
           </section>
 
           {/* Intra Mode Button */}
@@ -388,7 +414,7 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
               style={{
                 width: '100%',
                 padding: '12px',
-                background: '#10b981',
+                background: '#667eea',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -397,6 +423,16 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                 cursor: intraModeLoading ? 'not-allowed' : 'pointer',
                 opacity: intraModeLoading ? 0.6 : 1,
                 transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (!intraModeLoading) {
+                  e.currentTarget.style.background = '#5a67d8';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!intraModeLoading) {
+                  e.currentTarget.style.background = '#667eea';
+                }
               }}
             >
               {intraModeLoading ? '🔍 Diving in...' : '🔍 Intra Mode'}
@@ -424,15 +460,98 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
             <section className="panel-section">
               <h3>Related Topics ({relatedNodes.length})</h3>
               <div className="node-list">
-                {relatedNodes.map(related => (
-                  related && (
-                    <div key={related.id} className="node-item">
-                      <span className="node-dot" style={{ backgroundColor: getSubjectColor(related.subject) }} />
-                      {related.label}
+                {relatedNodes.map(related => {
+                  if (!related) return null;
+                  
+                  // Create unique pair ID (sorted to ensure consistency)
+                  const pairId = [node.id, related.id].sort().join('-');
+                  const isBridged = bridgedPairs.has(pairId);
+                  
+                  // Check if bridge already exists in tree
+                  const existingBridge = tree.edges.some(edge => {
+                    const edgeNodes = [edge.from, edge.to].sort();
+                    const pairNodes = [node.id, related.id].sort();
+                    return edge.type === 'prereq' && 
+                           edgeNodes[0] === pairNodes[0] && 
+                           edgeNodes[1] === pairNodes[1];
+                  });
+                  
+                  const isDisabled = isBridged || existingBridge || bridgeLoading[related.id];
+                  
+                  return (
+                    <div key={related.id} style={{ marginBottom: '12px' }}>
+                      <div className="node-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="node-dot" style={{ backgroundColor: getSubjectColor(related.subject) }} />
+                          {related.label}
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!node || isDisabled) return;
+                            setBridgeLoading(prev => ({ ...prev, [related.id]: true }));
+                            setBridgeError(null);
+                            try {
+                              // Generate bridge topic using AI
+                              const response = await fetch('/api/ai/generate-bridge-topic', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                  topic1: node.label, 
+                                  topic2: related.label 
+                                }),
+                              });
+                              if (!response.ok) throw new Error('Failed to generate bridge topic');
+                              const bridgeData = await response.json();
+                              console.log('✅ Generated bridge topic:', bridgeData);
+                              
+                              // Create the bridge node
+                              const createRes = await fetch('/api/tree/nodes', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  label: bridgeData.label,
+                                  subject: bridgeData.subject,
+                                  parents: [node.id, related.id],
+                                  masteryLevel: 'none'
+                                }),
+                              });
+                              
+                              if (createRes.ok) {
+                                console.log(`✅ Created bridge topic: ${bridgeData.label}`);
+                                // Mark this pair as bridged
+                                setBridgedPairs(prev => new Set([...prev, pairId]));
+                                onUpdate(); // Refresh the tree
+                              }
+                            } catch (err) {
+                              setBridgeError(err instanceof Error ? err.message : 'Failed to create bridge topic');
+                              console.error('Bridge topic error:', err);
+                            } finally {
+                              setBridgeLoading(prev => ({ ...prev, [related.id]: false }));
+                            }
+                          }}
+                          disabled={isDisabled}
+                          style={{
+                            padding: '4px 12px',
+                            background: isDisabled ? '#d1d5db' : '#8b5cf6',
+                            color: isDisabled ? '#9ca3af' : 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s',
+                            opacity: isDisabled ? 0.5 : 1,
+                          }}
+                          title={isBridged || existingBridge ? 'Bridge already created' : `Generate a bridge topic combining ${node.label} and ${related.label}`}
+                        >
+                          {bridgeLoading[related.id] ? '🌉...' : (isBridged || existingBridge ? '✓ Bridged' : '🌉 Bridge')}
+                        </button>
+                      </div>
                     </div>
-                  )
-                ))}
+                  );
+                })}
               </div>
+              {bridgeError && <p style={{ color: 'crimson', marginTop: '8px', fontSize: '12px' }}>{bridgeError}</p>}
             </section>
           )}
 
@@ -461,7 +580,21 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
               <>
                 {resourceInfo.wikipedia && (
                   <div className="source-block">
-                    <h4>{resourceInfo.wikipedia.title}</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <h4 style={{ margin: 0 }}>{resourceInfo.wikipedia.title}</h4>
+                      {(resourceInfo.wikipedia as any).isAiGenerated && (
+                        <span style={{
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                        }}>
+                          🤖 AI
+                        </span>
+                      )}
+                    </div>
                     {resourceInfo.wikipedia.image && (
                       <img
                         src={resourceInfo.wikipedia.image}
@@ -532,7 +665,7 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                 {!arxivLoading && !arxivError && resourceInfo?.arxiv && resourceInfo.arxiv.length > 0 && (
                   <div className="source-block" style={{ marginTop: 10 }}>
                     <details>
-                      <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1em' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '1em', color: '#111827' }}>
                         Further Exploration (arXiv)
                       </summary>
                       <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: 8 }}>
@@ -542,9 +675,9 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                             <br />
                             <em style={{ fontSize: '0.9em' }}>{paper.authors.join(', ')}</em>
                             <br />
-                            <span style={{ color: '#555', fontSize: '0.85em' }}>{paper.published?.slice(0, 10)}</span>
+                            <span style={{ color: '#6b7280', fontSize: '0.85em' }}>{paper.published?.slice(0, 10)}</span>
                             <br />
-                            <p style={{ fontSize: '0.9em', marginTop: 4 }}>{paper.summary.slice(0, 150)}...</p>
+                            <p style={{ fontSize: '0.9em', marginTop: 4, color: '#1f2937' }}>{paper.summary.slice(0, 150)}...</p>
                             {paper.pdfUrl && (
                               <a 
                                 href={paper.pdfUrl} 
@@ -562,7 +695,7 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                   </div>
                 )}
                 {!arxivLoading && !arxivError && resourceInfo?.arxiv && resourceInfo.arxiv.length === 0 && (
-                  <p style={{ fontStyle: 'italic', color: '#666' }}>
+                  <p style={{ fontStyle: 'italic', color: '#6b7280' }}>
                     No arXiv papers found for this concept.
                   </p>
                 )}
@@ -709,7 +842,7 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                ✓ Yes
+                ✓ Good
               </button>
               <button
                 onClick={() => handleContentModalResponse('well')}
