@@ -23,6 +23,7 @@ function toTitleCase(str: string): string {
 
 export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
   const [label, setLabel] = useState('');
+  const [isFamiliar, setIsFamiliar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
     
     // Create nodes from the chain, starting from root to leaf
     for (let i = parentChain.length - 1; i >= 0; i--) {
-      const conceptName = toTitleCase(parentChain[i]); // Auto-capitalize
+      const conceptName = toTitleCase(parentChain[i]);
       const conceptId = parentChain[i].toLowerCase().replace(/\s+/g, '-');
       
       console.log(`  📍 Processing [${i}]: ${conceptName} (${conceptId})`);
@@ -66,7 +67,8 @@ export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
         body: JSON.stringify({
           label: conceptName,
           subject: subject,
-          parents: [parentId]
+          parents: [parentId],
+          masteryLevel: 'none'
         }),
       });
       
@@ -109,7 +111,9 @@ export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
 
     // Finally, add the actual topic the user wanted
     const capitalizedTopic = toTitleCase(finalTopic);
-    console.log(`  🎯 Adding final topic: ${capitalizedTopic} with parent: ${chainSuggestion.immediateParent}`);
+    const masteryLevel = isFamiliar ? 'familiar' : 'none';
+    
+    console.log(`  🎯 Adding final topic: ${capitalizedTopic} with parent: ${chainSuggestion.immediateParent} (mastery: ${masteryLevel})`);
     
     const nodeResponse = await fetch('http://localhost:4000/api/tree/nodes', {
       method: 'POST',
@@ -117,11 +121,40 @@ export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
       body: JSON.stringify({
         label: capitalizedTopic,
         subject: subject,
-        parents: [chainSuggestion.immediateParent]
+        parents: [chainSuggestion.immediateParent],
+        masteryLevel: masteryLevel
       }),
     });
     
     console.log(`  📡 Final node creation response:`, nodeResponse.status);
+    
+    // If user marked as familiar, log that interaction to Snowflake for mastery tracking
+    if (isFamiliar && nodeResponse.ok) {
+      const nodeId = finalTopic.toLowerCase().replace(/\s+/g, '-');
+      console.log(`  🔄 Logging already_familiar for ${capitalizedTopic}...`);
+      try {
+        const masteryResponse = await fetch('http://localhost:4000/api/mastery/log-interaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'default-user',
+            nodeId: nodeId,
+            interactionType: 'already_familiar',
+            durationSeconds: 0,
+            metadata: { timestamp: new Date().toISOString(), source: 'new_topic_creation' }
+          }),
+        });
+        console.log(`  📡 Mastery logging response:`, masteryResponse.status);
+        if (!masteryResponse.ok) {
+          const errorText = await masteryResponse.text();
+          console.error(`  ⚠️  Mastery logging failed:`, errorText);
+        } else {
+          console.log(`  ✅ Logged already_familiar for ${capitalizedTopic}`);
+        }
+      } catch (err) {
+        console.error(`  ⚠️  Failed to log already_familiar:`, err);
+      }
+    }
     
     // Add related edges for final topic
     if (chainSuggestion.related && chainSuggestion.related.length > 0) {
@@ -142,50 +175,50 @@ export default function AddTopicForm({ onTopicAdded }: AddTopicFormProps) {
     return nodeResponse;
   };
 
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  
-  if (!label.trim()) {
-    setError('Topic name is required');
-    return;
-  }
-
-  setIsSubmitting(true);
-  setError(null);
-
-  try {
-    // Get AI chain suggestion
-    const suggestionResponse = await fetch('http://localhost:4000/api/ai/suggest-chain', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topicName: label }),
-    });
-
-    if (!suggestionResponse.ok) throw new Error('Failed to get AI suggestion');
-
-    const suggestion: ChainSuggestion = await suggestionResponse.json();
-
-    // Create the chain of nodes
-    const nodeResponse = await createNodeChain(suggestion, label);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     
-    if (!nodeResponse.ok) throw new Error('Failed to add topic');
+    if (!label.trim()) {
+      setError('Topic name is required');
+      return;
+    }
 
-    console.log('✅ All nodes and edges created!');
-    
-    // Small delay to ensure backend has processed everything
-    await new Promise(resolve => setTimeout(resolve, 100));
+    setIsSubmitting(true);
+    setError(null);
 
-    setLabel('');
-    onTopicAdded(); // This calls fetchTree()
-    
-    console.log('🔄 Refresh triggered');
-  } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to add topic');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    try {
+      // Get AI chain suggestion
+      const suggestionResponse = await fetch('http://localhost:4000/api/ai/suggest-chain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicName: label }),
+      });
 
+      if (!suggestionResponse.ok) throw new Error('Failed to get AI suggestion');
+
+      const suggestion: ChainSuggestion = await suggestionResponse.json();
+
+      // Create the chain of nodes
+      const nodeResponse = await createNodeChain(suggestion, label);
+      
+      if (!nodeResponse.ok) throw new Error('Failed to add topic');
+
+      console.log('✅ All nodes and edges created!');
+      
+      // Small delay to ensure backend has processed everything
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      setLabel('');
+      setIsFamiliar(false);
+      onTopicAdded();
+      
+      console.log('🔄 Refresh triggered');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add topic');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="add-topic-form">
@@ -197,6 +230,20 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         disabled={isSubmitting}
         className="form-input"
       />
+
+      <div className="familiar-toggle-container">
+        <span className="toggle-label">I'm already familiar with this</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isFamiliar}
+          onClick={() => setIsFamiliar(!isFamiliar)}
+          disabled={isSubmitting}
+          className={`toggle-switch ${isFamiliar ? 'active' : ''}`}
+        >
+          <span className="toggle-slider" />
+        </button>
+      </div>
 
       <button type="submit" disabled={isSubmitting} className="form-button">
         {isSubmitting ? '🤖 Building chain...' : '+ Add Topic'}

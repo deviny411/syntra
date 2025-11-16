@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import KnowledgeGraph from "./KnowledgeGraph";
 import AddTopicForm from "./AddTopicForm";
+import NodeDetailsPanel from "./NodeDetailsPanel";
 import "./App.css";
 
+// 👇 Add 'export' to all these
 export type Subject =
   | "Math"
   | "CS"
@@ -28,6 +30,7 @@ export interface ConceptNode {
   label: string;
   subject: Subject;
   masteryLevel: MasteryLevel;
+  parents?: string[];
   tags?: string[];
 }
 
@@ -47,26 +50,26 @@ function App() {
   const [tree, setTree] = useState<KnowledgeTree | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const fetchTree = () => {
-  console.log('🔄 Fetching tree...');  // 👈 Add this
-  fetch("http://localhost:4000/api/tree")
-    .then((res) => {
-      if (!res.ok) throw new Error("Failed to fetch tree");
-      return res.json();
-    })
-    .then((data: KnowledgeTree) => {
-      console.log('✅ Tree fetched:', data.nodes.length, 'nodes,', data.edges.length, 'edges');  // 👈 Add this
-      setTree(data);
-      setLoading(false);
-    })
-    .catch((err) => {
-      console.error("Error fetching tree:", err);
-      setError(err.message);
-      setLoading(false);
-    });
-};
-
+    console.log('🔄 Fetching tree...');
+    fetch("http://localhost:4000/api/tree")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch tree");
+        return res.json();
+      })
+      .then((data: KnowledgeTree) => {
+        console.log('✅ Tree fetched:', data.nodes.length, 'nodes,', data.edges.length, 'edges');
+        setTree(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching tree:", err);
+        setError(err.message);
+        setLoading(false);
+      });
+  };
 
   useEffect(() => {
     fetchTree();
@@ -105,14 +108,28 @@ function App() {
         </div>
 
         <div className="sidebar-footer">
-          <p>💡 Drag nodes • Zoom • Pan</p>
+          <p>💡 Click nodes to view details</p>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="main-content">
-        <KnowledgeGraph tree={tree} />
+        <KnowledgeGraph 
+          tree={tree} 
+          onNodeSelect={setSelectedNodeId}
+        />
       </main>
+
+      {/* Details Panel */}
+      <NodeDetailsPanel
+        nodeId={selectedNodeId}
+        tree={tree}
+        onClose={() => {
+          console.log('[App] Closing panel');
+          setSelectedNodeId(null);
+        }}
+        onUpdate={fetchTree}
+      />
     </div>
   );
 }

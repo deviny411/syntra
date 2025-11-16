@@ -11,6 +11,6 @@
     "moduleResolution": "node",
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test_concept_fetch.js"],
   "exclude": ["node_modules", "dist"]
 }

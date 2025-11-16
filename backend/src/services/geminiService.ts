@@ -40,8 +40,15 @@ async function extractJSON(apiResponse: any): Promise<string> {
   text = text.replace(codeBlockPattern, '');
   text = text.trim();
   
-  const jsonStart = text.indexOf('{');
-  const jsonEnd = text.lastIndexOf('}');
+  // Try to find JSON object first (for { })
+  let jsonStart = text.indexOf('{');
+  let jsonEnd = text.lastIndexOf('}');
+  
+  // If no object found, try array (for [ ])
+  if (jsonStart === -1 || jsonEnd === -1) {
+    jsonStart = text.indexOf('[');
+    jsonEnd = text.lastIndexOf(']');
+  }
   
   if (jsonStart === -1 || jsonEnd === -1) {
     console.error('❌ No JSON found in response:', text);
@@ -110,68 +117,86 @@ If no good related topics exist, return empty array: []`;
 
     console.log('📋 Existing nodes:', existingNodes.length);
 
-    const prompt = `You are helping organize a knowledge graph. A user wants to add: "${topicName}".
+   const prompt = `You are helping organize a knowledge graph. A user wants to add: "${topicName}".
 
 EXISTING topics in the graph:
 ${nodesList}
 
-Your task: Build a LOGICAL prerequisite chain for "${topicName}".
+Your task: Determine the SIMPLEST, MOST DIRECT path to connect "${topicName}".
 
-CRITICAL INSTRUCTIONS:
-1. Determine the CORRECT subject based on what "${topicName}" truly is:
-   - Atoms, Molecules, Elements, Compounds → Chemistry
-   - Motion, Forces, Energy, Waves → Physics
-   - Algorithms, Programming, AI → CS
-   - Calculus, Algebra, Geometry → Math
-   
-2. parentChain MUST start with an EXISTING node from the list above (like "chem-root", "phys-root", "cs-root")
+CRITICAL RULES:
 
-3. parentChain format: [EXISTING_ROOT, "New Parent", "Immediate Parent"]
+1. **Prefer EXISTING nodes over creating new ones**
+   - If an existing node is a good parent, USE IT directly
+   - Only create intermediate nodes if truly necessary
+   - Ex. If intermediate nodes would also cover a variety of other sub sub topics like BFS would go into ALgorithms then CS, not directly to CS, because there are many other Algorithms. 
+2. **Make sure you are looking for related nodes**
+   - Suggest related nodes that enhance understanding but are NOT direct prerequisites
+   - E.g., for "Neural Networks", "Calculus" is related but not a prerequisite
+   - Suggest two nodes that have a related subtopic that stem from both. Ex. Quantum Mechanics and Computer Science --> Quantum Computing
+3. **When to create chains:**
+   - Only when "${topicName}" is very specific and needs a clear intermediate concept
+   - Example: "Convolutional Neural Networks" needs ML → AI → CS (good chain)
+   - Example: "Atoms" can go directly to "Chemistry" (no chain needed)
+
+4. **parentChain format:**
+   - If connecting directly: ["existing-node-id"]
+   - If chain needed: ["root-id", "Intermediate Concept", "Immediate Parent"]
    - First item MUST be an existing node ID from the list
-   - Last item is the immediate parent of "${topicName}"
-   - Middle items are concepts that bridge them
-   - Use Title Case for new concepts (e.g., "Machine Learning" not "machine learning")
 
-4. immediateParent is the slug version of the last item in parentChain
+5. **Subject categories:**
+   - Atoms, Molecules, Reactions → Chemistry
+   - Motion, Forces, Energy, Quantum → Physics
+   - Algorithms, ML, Programming → CS
+   - Calculus, Algebra, Geometry → Math
 
-5. Only suggest related topics using exact IDs from the existing list
+EXAMPLES OF GOOD SUGGESTIONS:
 
-CORRECT EXAMPLES:
-
-For "atoms" (Chemistry):
-{
-  "subject": "Chemistry",
-  "immediateParent": "matter",
-  "parentChain": ["chem-root", "Matter"],
-  "related": [],
-  "reasoning": "Atoms are fundamental to Chemistry, studied under Matter"
-}
-
-For "quantum mechanics" (Physics):
+**Simple/Direct (PREFERRED):**
+Input: "Quantum Mechanics"
 {
   "subject": "Physics",
-  "immediateParent": "modern-physics",
-  "parentChain": ["phys-root", "Modern Physics"],
-  "related": [],
-  "reasoning": "Quantum Mechanics is a branch of Modern Physics"
+  "immediateParent": "phys-root",
+  "parentChain": ["phys-root"],
+  "related": ["Quantum Computing"],
+  "reasoning": "Quantum Mechanics is a major branch of Physics, connects directly to Physics root"
 }
 
-For "computer vision" (CS):
+Input: "Organic Chemistry"  
+{
+  "subject": "Chemistry",
+  "immediateParent": "chem-root",
+  "parentChain": ["chem-root"],
+  "related": ["molecules"],
+  "reasoning": "Organic Chemistry is a major branch of Chemistry, connects directly"
+}
+
+**Chain needed (for very specific topics):**
+Input: "Backpropagation"
 {
   "subject": "CS",
-  "immediateParent": "machine-learning",
-  "parentChain": ["cs-root", "Artificial Intelligence", "Machine Learning"],
-  "related": ["lin-alg"],
-  "reasoning": "Computer Vision uses ML techniques, which is part of AI under CS"
+  "immediateParent": "neural-networks",
+  "parentChain": ["cs-root", "Machine Learning", "Neural Networks"],
+  "related": ["calc"],
+  "reasoning": "Backpropagation is a specific technique in Neural Networks, which is part of ML under CS. Requires calculus knowledge."
+}
+
+Input: "LSTM Networks"
+{
+  "subject": "CS",
+  "immediateParent": "neural-networks",
+  "parentChain": ["neural-networks"],
+  "related": [],
+  "reasoning": "LSTM is a type of neural network. Neural Networks already exists, so connect directly to it."
 }
 
 Respond with valid JSON:
 {
-  "subject": "Chemistry",
+  "subject": "category",
   "immediateParent": "slug-format",
-  "parentChain": ["existing-root-id", "Title Case Concept"],
-  "related": [],
-  "reasoning": "brief explanation"
+  "parentChain": ["existing-id-or-chain"],
+  "related": ["existing-id"],
+  "reasoning": "explanation of why this is the simplest path"
 }`;
 
     const response = await ai.models.generateContent({
@@ -229,5 +254,68 @@ Respond ONLY with valid JSON:
 
     const jsonText = await extractJSON(response);
     return JSON.parse(jsonText);
+  },
+
+  // Generate subtopics for Intra Mode
+  generateSubtopics: async (
+    topicName: string,
+    existingNodes: Array<{ id: string; label: string; subject: string }>
+  ): Promise<{
+    subtopics: Array<{
+      label: string;
+      subject: string;
+      description: string;
+      relatedNodeIds: string[];
+    }>;
+    reasoning: string;
+  }> => {
+    console.log(`\n🔍 Generating subtopics for: "${topicName}"`);
+    
+    const nodesList = existingNodes
+      .map(n => `- ${n.label} (${n.subject}, id: ${n.id})`)
+      .join('\n');
+
+    const prompt = `You are an expert knowledge structure designer. A user wants to explore "${topicName}" in depth and learn its subtopics.
+
+EXISTING TOPICS IN THE KNOWLEDGE BASE:
+${nodesList}
+
+Your task: Generate 3-5 detailed subtopics of "${topicName}" that break down this concept into digestible learning units. For each subtopic:
+1. Give it a clear, specific name
+2. Assign the appropriate subject category
+3. Provide a brief description
+4. Identify 0-2 existing topics that are RELATED (not parent/child, but conceptually connected) to this subtopic
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{
+  "subtopics": [
+    {
+      "label": "subtopic name",
+      "subject": "subject category",
+      "description": "brief explanation of what this subtopic covers",
+      "relatedNodeIds": ["existing-id-1", "existing-id-2"]
+    }
+  ],
+  "reasoning": "why these subtopics were chosen for ${topicName}"
+}
+
+RULES:
+- Subtopic names should be 2-4 words (e.g., "Linear Transformations", "Neural Network Architecture")
+- Subject categories: Math, CS, Physics, Biology, Chemistry, Engineering, Economics, Psychology, Sociology, Philosophy, History, Literature, Art, Music, Language, Other
+- relatedNodeIds should only contain IDs that actually exist in the list above
+- Keep descriptions concise (1 sentence)
+- All subtopics should be CONCEPTUALLY UNDER "${topicName}", not parent topics`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-001',
+      contents: prompt,
+    });
+
+    const jsonText = await extractJSON(response);
+    const parsed = JSON.parse(jsonText);
+    
+    console.log('✅ PARSED SUBTOPICS:', JSON.stringify(parsed, null, 2));
+    return parsed;
   },
 };

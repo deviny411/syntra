@@ -73,4 +73,28 @@ router.post("/find-related", async (req, res) => {  // 👈 Add this
   }
 });
 
+router.post("/generate-subtopics", async (req, res) => {
+  const { topicName } = req.body;
+
+  if (!topicName) {
+    return res.status(400).json({ error: "topicName is required" });
+  }
+
+  try {
+    const existingNodes = treeService.getTree().nodes;
+    const subtopics = await geminiService.generateSubtopics(
+      topicName,
+      existingNodes
+    );
+
+    res.json(subtopics);
+  } catch (error) {
+    console.error("AI generate subtopics error:", error);
+    res.status(500).json({ 
+      error: "Failed to generate subtopics",
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router;
