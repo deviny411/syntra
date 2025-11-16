@@ -647,12 +647,13 @@ export default function NodeDetailsPanel({ nodeId, tree, onClose, onUpdate }: No
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
+                                color: '#111827',
                               }}
                               title={video.title}
                             >
                               {truncateTitle(video.title)}
                             </div>
-                            <div style={{ fontSize: '0.8em', color: '#666', marginTop: 4 }}>{video.channelTitle}</div>
+                            <div style={{ fontSize: '0.8em', color: '#6b7280', marginTop: 4 }}>{video.channelTitle}</div>
                           </a>
                         </div>
                       ))}
