@@ -1,13 +1,13 @@
-Syntra
+#Syntra
 AI-powered learning companion that transforms any subject into an interactive knowledge map. Visualize, connect, and master topics with personalized AI recommendations, mastery tracking, and seamless integration of real-world learning resources.
 
-**CHECK OUT OUR DEMO HERE**
+#**CHECK OUT OUR DEMO HERE**
 https://youtu.be/65d3eaMDW3M 
 
-📚 Inspiration
+##📚 Inspiration
 Learning complex topics often feels like navigating a maze: disconnected concepts, no clear path forward, and no feedback on what’s mastered. Syntra was inspired by the need for a tool that not only aggregates the world’s learning resources but actively helps users see and build their understanding—concept by concept, connection by connection.
 
-🚀 What it does
+##🚀 What it does
 Interactive Knowledge Graph: Visualize your knowledge as a dynamic, AI-structured map.
 
 Automatic Connections: Gemini AI links new topics to related nodes and finds subtopics within each concept.
@@ -20,7 +20,7 @@ AI Recommendations: Snowflake logs every interaction; Mistral and Cortex AI anal
 
 Subtopic Generation & Bridge Topics: Intra-Explore unveils granular subtopics, and AI builds bridges between seemingly distant areas—no more blind spots in your learning.
 
-🛠️ How we built it
+##🛠️ How we built it
 Frontend: React + Vite for a fast, interactive UI; D3 and XYFlow for force-directed graph visualization.
 
 Backend: Node.js + Express/TypeScript APIs for graph/knowledge management and resource aggregation.
@@ -39,7 +39,7 @@ APIs: Real-time scraping/fetching from Wikipedia, YouTube Data API, arXiv, with 
 
 DevOps: Modular microservice structure, code-splitting, RESTful interfaces, and local-remote mode support.
 
-🧱 Challenges we ran into
+##🧱 Challenges we ran into
 AI Integration: prompt engineering for Gemini to give robust, controlled chains/subtopics and minimize hallucinations.
 
 Analytics Pipelining: Designing the interaction log/mastery calculation flows to work smoothly across REST (Node) and analytics (Python/Snowflake).
@@ -48,7 +48,7 @@ Graph Visualization: Efficiently rendering large, growing graphs with force-dire
 
 Domain Scaling: Creating subject-agnostic routines for node-linking, subtopic extraction, and mastery analytics.
 
-✨ Accomplishments that we're proud of
+##✨ Accomplishments that we're proud of
 Reliable multi-level mastery tracking, supporting both manual and data-driven updates.
 
 Seamless AI-driven graph linking and subtopic/bridge node generation.
@@ -57,7 +57,7 @@ Real-time integration of learning resources—articles, videos, papers—without
 
 Robust logging and analysis pipeline for personalized mastery and recommendation.
 
-🧠 What we learned
+##🧠 What we learned
 The value of decoupling slow content (arXiv) from instant knowledge (Wikipedia/YouTube/IQ).
 
 How to tune AI prompts for "just right" knowledge chaining, not overshooting generic or overconnected topics.
@@ -66,7 +66,7 @@ How mastery is best represented not as a static value but as a dynamic function 
 
 How enterprise-grade analytics (Snowflake) can power personalized learning at any scale.
 
-⏭️ What's next for Syntra
+##⏭️ What's next for Syntra
 Integrations: Add Khan Academy, news article APIs, and other educational resources.
 
 Collaborative Analytics: Use Cortex to analyze aggregate user paths and success, feeding those insights back into recommendations for all users.
